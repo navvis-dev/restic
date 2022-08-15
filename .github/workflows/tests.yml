@@ -26,7 +26,7 @@ jobs:
           - job_name: macOS
             go: 1.19.x
             os: macOS-latest
-            test_fuse: false
+            test_fuse: true
             install_verb: install
 
           - job_name: Linux

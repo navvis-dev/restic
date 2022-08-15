@@ -1,12 +1,12 @@
 module github.com/restic/restic
 
 require (
-	bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512
 	cloud.google.com/go/iam v0.3.0 // indirect
 	cloud.google.com/go/storage v1.21.0
 	github.com/Azure/azure-sdk-for-go v62.3.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.24 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
+	github.com/anacrolix/fuse v0.2.0
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/dnaeon/go-vcr v1.2.0 // indirect

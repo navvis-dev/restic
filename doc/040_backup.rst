@@ -299,7 +299,7 @@ directory, then selectively add back some of them.
 
 ::
 
-    $HOME/**/*
+    $HOME/*
     !$HOME/Documents
     !$HOME/code
     !$HOME/.emacs.d
@@ -555,11 +555,13 @@ environment variables. The following lists these environment variables:
     RESTIC_COMPRESSION                  Compression mode (only available for repository format version 2)
     RESTIC_PROGRESS_FPS                 Frames per second by which the progress bar is updated
     RESTIC_PACK_SIZE                    Target size for pack files
+    RESTIC_READ_CONCURRENCY             Concurrency for file reads
 
     TMPDIR                              Location for temporary files
 
     AWS_ACCESS_KEY_ID                   Amazon S3 access key ID
     AWS_SECRET_ACCESS_KEY               Amazon S3 secret access key
+    AWS_SESSION_TOKEN                   Amazon S3 temporary session token
     AWS_DEFAULT_REGION                  Amazon S3 default region
     AWS_PROFILE                         Amazon credentials profile (alternative to specifying key and region)
     AWS_SHARED_CREDENTIALS_FILE         Location of the AWS CLI shared credentials file (default: ~/.aws/credentials)

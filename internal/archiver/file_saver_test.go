@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -33,10 +34,8 @@ func createTestFiles(t testing.TB, num int) (files []string, cleanup func()) {
 func startFileSaver(ctx context.Context, t testing.TB) (*FileSaver, context.Context, *errgroup.Group) {
 	wg, ctx := errgroup.WithContext(ctx)
 
-	saveBlob := func(ctx context.Context, tpe restic.BlobType, buf *Buffer) FutureBlob {
-		ch := make(chan SaveBlobResponse)
-		close(ch)
-		return FutureBlob{ch: ch}
+	saveBlob := func(ctx context.Context, tpe restic.BlobType, buf *Buffer, cb func(SaveBlobResponse)) {
+		cb(SaveBlobResponse{})
 	}
 
 	workers := uint(runtime.NumCPU())
@@ -46,7 +45,9 @@ func startFileSaver(ctx context.Context, t testing.TB) (*FileSaver, context.Cont
 	}
 
 	s := NewFileSaver(ctx, wg, saveBlob, pol, workers, workers)
-	s.NodeFromFileInfo = restic.NodeFromFileInfo
+	s.NodeFromFileInfo = func(snPath, filename string, fi os.FileInfo) (*restic.Node, error) {
+		return restic.NodeFromFileInfo(filename, fi)
+	}
 
 	return s, ctx, wg
 }
@@ -59,6 +60,7 @@ func TestFileSaver(t *testing.T) {
 	defer cleanup()
 
 	startFn := func() {}
+	completeReadingFn := func() {}
 	completeFn := func(*restic.Node, ItemStats) {}
 
 	testFs := fs.Local{}
@@ -77,7 +79,7 @@ func TestFileSaver(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ff := s.Save(ctx, filename, filename, f, fi, startFn, completeFn)
+		ff := s.Save(ctx, filename, filename, f, fi, startFn, completeReadingFn, completeFn)
 		results = append(results, ff)
 	}
 

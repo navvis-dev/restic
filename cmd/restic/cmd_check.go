@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"math/rand"
 	"strconv"
@@ -34,7 +35,7 @@ Exit status is 0 if the command was successful, and non-zero if there was any er
 `,
 	DisableAutoGenTag: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runCheck(checkOptions, globalOptions, args)
+		return runCheck(cmd.Context(), checkOptions, globalOptions, args)
 	},
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		return checkFlags(checkOptions)
@@ -148,10 +149,10 @@ func parsePercentage(s string) (float64, error) {
 
 // prepareCheckCache configures a special cache directory for check.
 //
-//  * if --with-cache is specified, the default cache is used
-//  * if the user explicitly requested --no-cache, we don't use any cache
-//  * if the user provides --cache-dir, we use a cache in a temporary sub-directory of the specified directory and the sub-directory is deleted after the check
-//  * by default, we use a cache in a temporary directory that is deleted after the check
+//   - if --with-cache is specified, the default cache is used
+//   - if the user explicitly requested --no-cache, we don't use any cache
+//   - if the user provides --cache-dir, we use a cache in a temporary sub-directory of the specified directory and the sub-directory is deleted after the check
+//   - by default, we use a cache in a temporary directory that is deleted after the check
 func prepareCheckCache(opts CheckOptions, gopts *GlobalOptions) (cleanup func()) {
 	cleanup = func() {}
 	if opts.WithCache {
@@ -191,25 +192,26 @@ func prepareCheckCache(opts CheckOptions, gopts *GlobalOptions) (cleanup func())
 	return cleanup
 }
 
-func runCheck(opts CheckOptions, gopts GlobalOptions, args []string) error {
+func runCheck(ctx context.Context, opts CheckOptions, gopts GlobalOptions, args []string) error {
 	if len(args) != 0 {
 		return errors.Fatal("the check command expects no arguments, only options - please see `restic help check` for usage and flags")
 	}
 
 	cleanup := prepareCheckCache(opts, &gopts)
-	AddCleanupHandler(func() error {
+	AddCleanupHandler(func(code int) (int, error) {
 		cleanup()
-		return nil
+		return code, nil
 	})
 
-	repo, err := OpenRepository(gopts)
+	repo, err := OpenRepository(ctx, gopts)
 	if err != nil {
 		return err
 	}
 
 	if !gopts.NoLock {
 		Verbosef("create exclusive lock for repository\n")
-		lock, err := lockRepoExclusive(gopts.ctx, repo)
+		var lock *restic.Lock
+		lock, ctx, err = lockRepoExclusive(ctx, repo)
 		defer unlockRepo(lock)
 		if err != nil {
 			return err
@@ -217,13 +219,13 @@ func runCheck(opts CheckOptions, gopts GlobalOptions, args []string) error {
 	}
 
 	chkr := checker.New(repo, opts.CheckUnused)
-	err = chkr.LoadSnapshots(gopts.ctx)
+	err = chkr.LoadSnapshots(ctx)
 	if err != nil {
 		return err
 	}
 
 	Verbosef("load indexes\n")
-	hints, errs := chkr.LoadIndex(gopts.ctx)
+	hints, errs := chkr.LoadIndex(ctx)
 
 	errorsFound := false
 	suggestIndexRebuild := false
@@ -260,7 +262,7 @@ func runCheck(opts CheckOptions, gopts GlobalOptions, args []string) error {
 	errChan := make(chan error)
 
 	Verbosef("check all packs\n")
-	go chkr.Packs(gopts.ctx, errChan)
+	go chkr.Packs(ctx, errChan)
 
 	for err := range errChan {
 		if checker.IsOrphanedPack(err) {
@@ -287,7 +289,7 @@ func runCheck(opts CheckOptions, gopts GlobalOptions, args []string) error {
 		defer wg.Done()
 		bar := newProgressMax(!gopts.Quiet, 0, "snapshots")
 		defer bar.Done()
-		chkr.Structure(gopts.ctx, bar, errChan)
+		chkr.Structure(ctx, bar, errChan)
 	}()
 
 	for err := range errChan {
@@ -308,7 +310,7 @@ func runCheck(opts CheckOptions, gopts GlobalOptions, args []string) error {
 	wg.Wait()
 
 	if opts.CheckUnused {
-		for _, id := range chkr.UnusedBlobs(gopts.ctx) {
+		for _, id := range chkr.UnusedBlobs(ctx) {
 			Verbosef("unused blob %v\n", id)
 			errorsFound = true
 		}
@@ -320,7 +322,7 @@ func runCheck(opts CheckOptions, gopts GlobalOptions, args []string) error {
 		p := newProgressMax(!gopts.Quiet, packCount, "packs")
 		errChan := make(chan error)
 
-		go chkr.ReadPacks(gopts.ctx, packs, p, errChan)
+		go chkr.ReadPacks(ctx, packs, p, errChan)
 
 		for err := range errChan {
 			errorsFound = true

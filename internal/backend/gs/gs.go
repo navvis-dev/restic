@@ -14,6 +14,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/pkg/errors"
 	"github.com/restic/restic/internal/backend"
+	"github.com/restic/restic/internal/backend/layout"
 	"github.com/restic/restic/internal/backend/sema"
 	"github.com/restic/restic/internal/debug"
 	"github.com/restic/restic/internal/restic"
@@ -28,10 +29,10 @@ import (
 // Backend stores data in a GCS bucket.
 //
 // The service account used to access the bucket must have these permissions:
-//  * storage.objects.create
-//  * storage.objects.delete
-//  * storage.objects.get
-//  * storage.objects.list
+//   - storage.objects.create
+//   - storage.objects.delete
+//   - storage.objects.get
+//   - storage.objects.list
 type Backend struct {
 	gcsClient    *storage.Client
 	projectID    string
@@ -41,7 +42,7 @@ type Backend struct {
 	bucket       *storage.BucketHandle
 	prefix       string
 	listMaxItems int
-	backend.Layout
+	layout.Layout
 }
 
 // Ensure that *Backend implements restic.Backend.
@@ -111,7 +112,7 @@ func open(cfg Config, rt http.RoundTripper) (*Backend, error) {
 		bucketName:  cfg.Bucket,
 		bucket:      gcsClient.Bucket(cfg.Bucket),
 		prefix:      cfg.Prefix,
-		Layout: &backend.DefaultLayout{
+		Layout: &layout.DefaultLayout{
 			Path: cfg.Prefix,
 			Join: path.Join,
 		},
@@ -174,13 +175,8 @@ func (be *Backend) IsNotExist(err error) bool {
 		return true
 	}
 
-	if er, ok := err.(*googleapi.Error); ok {
-		if er.Code == 404 {
-			return true
-		}
-	}
-
-	return false
+	var gerr *googleapi.Error
+	return errors.As(err, &gerr) && gerr.Code == 404
 }
 
 // Join combines path components with slashes.

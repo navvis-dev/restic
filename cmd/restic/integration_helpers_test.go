@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/restic/restic/internal/backend/retry"
 	"github.com/restic/restic/internal/options"
 	"github.com/restic/restic/internal/repository"
 	"github.com/restic/restic/internal/restic"
@@ -172,6 +172,7 @@ func withTestEnvironment(t testing.TB) (env *testEnvironment, cleanup func()) {
 
 	repository.TestUseLowSecurityKDFParameters(t)
 	restic.TestDisableCheckPolynomial(t)
+	retry.TestFastRetries(t)
 
 	tempdir, err := ioutil.TempDir(rtest.TestTempDir, "restic-test-")
 	rtest.OK(t, err)
@@ -193,7 +194,6 @@ func withTestEnvironment(t testing.TB) (env *testEnvironment, cleanup func()) {
 		Repo:     env.repo,
 		Quiet:    true,
 		CacheDir: env.cache,
-		ctx:      context.Background(),
 		password: rtest.TestPassword,
 		stdout:   os.Stdout,
 		stderr:   os.Stderr,
